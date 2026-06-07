@@ -7,19 +7,28 @@
 
 ## 1. Product Overview
 
-The Keycloak Integration product provides a **centralized identity and profile-management service** for HunterKillTree applications. It delegates authentication and credential storage to a [Keycloak](https://www.keycloak.org/) identity provider (IdP) while maintaining an application-side **user profile store** in MongoDB.
+### 1.1 Goal
 
-The system has two components:
+**Build Keycloak into a self-contained, reusable identity microservice — an "Authentication & Identity Service" — that any application can integrate with quickly and with minimal effort.**
 
-- **`keycloak-be`** — a Spring Boot REST service. It acts as an OAuth2 *resource server* (validating Keycloak-issued JWTs) and as an *admin client* to Keycloak (creating users, fetching user records via the Keycloak Admin API using a `client_credentials` service token). Profiles are persisted in MongoDB.
-- **`web-app`** — a React single-page application using `keycloak-js` to drive the login/SSO flow and call the backend with the user's bearer token.
+Rather than each product re-implementing login, registration, token validation, and credential storage, this repository packages a [Keycloak](https://www.keycloak.org/) identity provider behind a thin Spring Boot service and exposes a clean, standards-based (OAuth2 / OpenID Connect) contract. Any client — a web SPA, a mobile app, a backend service, or a third-party system — can plug into it with nothing more than a client registration and a few configuration values, and immediately get authentication, JWT-based authorization, and user/profile management.
 
-### 1.1 Business Goals
+The service is designed to be **drop-in**: it speaks open standards (OIDC, OAuth2, JWT) so integrators are never locked into a proprietary SDK, owns its own data and identity store so it can be deployed and scaled independently, and presents a stable REST + token contract so consuming applications need no knowledge of Keycloak internals.
 
-1. Provide a single, reusable authentication and profile foundation so individual product teams do not re-implement login, registration, or credential storage.
-2. Externalize credential security (password hashing, token issuance, session management, social login) to a hardened IdP rather than the application database.
-3. Maintain an application-owned profile record per user so business data (name, date of birth, email) lives alongside, but separate from, the identity record.
-4. Support role-based access control so privileged operations (delete user, change role) are restricted to administrators.
+### 1.2 What the system delivers
+
+- **`keycloak-be`** — the identity microservice. A Spring Boot REST service that acts as an OAuth2 *resource server* (validating Keycloak-issued JWTs) and as a trusted *admin client* to Keycloak (provisioning users and fetching user records via the Keycloak Admin API using a `client_credentials` service token). It owns an application-side **profile store** in MongoDB.
+- **`web-app`** — a React reference client using `keycloak-js`. It demonstrates how any application is expected to integrate: drive the Keycloak SSO flow, then call the service with the user's bearer token.
+- **Keycloak (IdP)** — the externalized authority for credentials, token issuance, sessions, social login, and role definitions.
+
+### 1.3 Business Goals
+
+1. **Integrate-once, reuse-everywhere:** provide a single authentication and profile foundation so product teams never re-implement login, registration, or credential storage.
+2. **Standards-based & vendor-neutral integration:** expose OIDC/OAuth2/JWT so any platform or language can integrate without a proprietary SDK.
+3. **Externalized credential security:** delegate password hashing, token issuance, session management, and social login to a hardened IdP rather than the application database.
+4. **Independent, scalable deployment:** run as a standalone microservice with its own data store, deployable and scalable separately from the applications that consume it.
+5. **Application-owned profiles:** maintain a profile record per user so business data (name, date of birth, email) lives alongside, but separate from, the identity record.
+6. **Centralized access control:** support role-based access control so privileged operations (delete user, change role) are restricted to administrators across all consuming apps.
 
 ### 1.2 Personas / Stakeholders
 
