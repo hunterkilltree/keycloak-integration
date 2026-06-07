@@ -1,0 +1,80 @@
+# Full local stack: Keycloak (IdP) + MongoDB + backend microservice + React frontend.
+#
+# Image names use ${DOCKER_USER} so `docker compose build` produces exactly the
+# tags that deploy.sh pushes to Docker Hub. Set DOCKER_USER in your shell or a
+# .env file next to this compose file, e.g.:  DOCKER_USER=yourdockerhubname
+#
+# Bring it up:   DOCKER_USER=yourname docker compose up -d --build
+# Tear it down:  docker compose down -v
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.0
+    command: ["start-dev"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8080"
+    networks:
+      - app-net
+    # NOTE: the "hunterkilltree" realm and its clients must exist in Keycloak.
+    # For repeatable setup, export your realm and mount it for auto-import:
+    #   volumes:
+    #     - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm.json:ro
+    #   command: ["start-dev", "--import-realm"]
+
+  mongodb:
+    image: bitnami/mongodb:7.0.11
+    environment:
+      MONGODB_ROOT_USER: root
+      MONGODB_ROOT_PASSWORD: root
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/bitnami/mongodb
+    networks:
+      - app-net
+
+  keycloak-be:
+    image: ${DOCKER_USER:-hunterkilltree}/keycloak-be:latest
+    build:
+      context: ./keycloak-be
+    depends_on:
+      - keycloak
+      - mongodb
+    environment:
+      # Mongo connection (overrides application.yml)
+      SPRING_DATA_MONGODB_URI: mongodb://root:root@mongodb:27017/keycloak-be?authSource=admin
+      # JWKS is fetched over the internal network; the issuer claim that the
+      # browser-issued token carries is http://localhost:8180/... so we validate
+      # against that string without hitting the discovery endpoint.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/hunterkilltree/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8180/realms/hunterkilltree
+      # Admin API / token exchange target (in-cluster URL)
+      IDP_URL: http://keycloak:8080
+      IDP_REALM: hunterkilltree
+      IDP_CLIENT_ID: app_germany
+      IDP_CLIENT_SECRET: ${IDP_CLIENT_SECRET:-3bpMEVmaryPn0H6SEWgCFQAU69AyFgBQ}
+    ports:
+      - "8080:8080"
+    networks:
+      - app-net
+
+  web-app:
+    image: ${DOCKER_USER:-hunterkilltree}/web-app:latest
+    build:
+      context: ./web-app
+    depends_on:
+      - keycloak-be
+    ports:
+      - "3000:80"
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  mongo-data:
