@@ -25,7 +25,7 @@ services:
     #   command: ["start-dev", "--import-realm"]
 
   mongodb:
-    image: bitnami/mongodb:7.0.11
+    image: soldevelo/mongodb:7.0.15
     environment:
       MONGODB_ROOT_USER: root
       MONGODB_ROOT_PASSWORD: root
